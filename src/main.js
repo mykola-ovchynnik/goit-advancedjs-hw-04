@@ -31,7 +31,7 @@ async function handlerSearch(event) {
 
   try {
     searchQuery = elements.searchForm.searchQuery.value;
-
+    elements.gallery.innerHTML = '';
     page = 1;
 
     const totalHits = await serviceImages();
