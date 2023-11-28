@@ -1,21 +1,36 @@
+import axios from 'axios';
+
 const BASE_URL = 'https://pixabay.com/api/';
 const API_KEY = '40888017-179b7a421750c84ea86ef3d3f';
 
-function serviceGetImages(searchQuery) {
-  const params = new URLSearchParams({
-    key: API_KEY,
-    q: searchQuery,
-    image_type: 'photo',
-    orientation: 'horizontal',
-    safesearch: 'true',
+axios.defaults.baseURL = BASE_URL;
+axios.defaults.params = {
+  key: API_KEY,
+  image_type: 'photo',
+  orientation: 'horizontal',
+  safesearch: 'true',
+  per_page: 40,
+};
+
+async function serviceGetImages(searchQuery, page) {
+  const instance = axios.create({
+    params: {
+      q: searchQuery,
+      page,
+    },
   });
 
-  return fetch(`${BASE_URL}?${params}`).then(resp => {
-    if (!resp.ok) {
-      throw new Error(resp.statusText);
-    }
-    return resp.json();
-  });
+  const response = await instance.get();
+
+  if (!response.data.totalHits) {
+    throw new Error(
+      'Sorry, there are no images matching your search query. Please try again.'
+    );
+  }
+
+  page += 1;
+
+  return response.data;
 }
 
 export { serviceGetImages };

@@ -1,28 +1,68 @@
 import { serviceGetImages } from './pixaby_api';
 
-const searchForm = document.querySelector('.search-form');
-const cardList = document.querySelector('.card-list');
+import iziToast from 'izitoast';
+import SimpleLightbox from 'simplelightbox';
 
-searchForm.addEventListener('submit', handlerSearch);
+import 'izitoast/dist/css/iziToast.min.css';
+import 'simplelightbox/dist/simple-lightbox.min.css';
 
-function handlerSearch(event) {
+const elements = {
+  searchForm: document.querySelector('.search-form'),
+  gallery: document.querySelector('.gallery'),
+  guard: document.querySelector('.js-guard'),
+};
+
+elements.searchForm.addEventListener('submit', handlerSearch);
+
+const options = {
+  root: null,
+  rootMargin: '300px',
+  threshold: 1.0,
+};
+
+const observer = new IntersectionObserver(handlerLoadMore, options);
+
+let page;
+let searchQuery;
+let shownItemCounter = 0;
+
+async function handlerSearch(event) {
   event.preventDefault();
 
-  const searchQuery = searchForm.searchQuery.value;
+  try {
+    searchQuery = elements.searchForm.searchQuery.value;
 
-  serviceGetImages(searchQuery)
-    .then(data => {
-      cardList.innerHTML = createMarkup(data.hits);
-    })
-    .catch(err => console.log(err));
+    page = 1;
 
-  searchForm.reset();
+    const totalHits = await serviceImages();
+
+    showSuccessMessage(totalHits);
+    observer.observe(elements.guard);
+  } catch (err) {
+    showErrorMessage(err.message);
+  } finally {
+    elements.searchForm.reset();
+  }
+}
+
+async function serviceImages() {
+  const { hits, totalHits } = await serviceGetImages(searchQuery, page);
+
+  elements.gallery.insertAdjacentHTML('beforeend', createMarkup(hits));
+  shownItemCounter += 40;
+
+  if (shownItemCounter >= totalHits) {
+    observer.disconnect();
+  }
+
+  initializeLightbox();
+  return totalHits;
 }
 
 function createMarkup(array) {
   return array
-    .map(
-      ({
+    .map(item => {
+      const {
         webformatURL,
         largeImageURL,
         tags,
@@ -30,28 +70,66 @@ function createMarkup(array) {
         views,
         comments,
         downloads,
-      }) => `
-    <li class="card-item">
-      <img src="${webformatURL}" alt="${tags}" data-largeImage="${largeImageURL}" class="image" />
-      <div class="card-stats">
-        <div class="wrapper">
-          <h3>Likes</h3>
-          <p>${likes}</p>
+      } = item;
+
+      return `
+      <a href="${largeImageURL}" class="photo-card" data-lightbox="gallery">
+        <img src="${webformatURL}" alt="${tags}" loading="lazy" />
+        <div class="info">
+          <p class="info-item">
+            <b>Likes</b> ${likes}
+          </p>
+          <p class="info-item">
+            <b>Views</b> ${views}
+          </p>
+          <p class="info-item">
+            <b>Comments</b> ${comments}
+          </p>
+          <p class="info-item">
+            <b>Downloads</b> ${downloads}
+          </p>
         </div>
-        <div class="wrapper">
-          <h3>Views</h3>
-          <p>${views}</p>
-        </div>
-        <div class="wrapper">
-          <h3>Comments</h3>
-          <p>${comments}</p>
-        </div>
-        <div class="wrapper">
-          <h3>Downloads</h3>
-          <p>${downloads}</p>
-        </div>
-      </div>
-    </li>`
-    )
+      </a>`;
+    })
     .join('');
+}
+
+function handlerLoadMore(entries) {
+  entries.forEach(async entry => {
+    if (entry.isIntersecting) {
+      page += 1;
+
+      enableSmoothScroll();
+      serviceImages();
+    }
+  });
+}
+
+function initializeLightbox() {
+  const lightbox = new SimpleLightbox('.gallery a');
+  lightbox.refresh();
+}
+
+function showSuccessMessage(totalHits) {
+  iziToast.success({
+    message: `Hooray! We found ${totalHits} images.`,
+    position: 'topRight',
+  });
+}
+
+function showErrorMessage(message) {
+  iziToast.error({
+    message,
+    position: 'topRight',
+  });
+}
+
+function enableSmoothScroll() {
+  const { height: cardHeight } =
+    elements.gallery.firstElementChild.getBoundingClientRect();
+
+  window.scrollBy({
+    top: cardHeight * 2,
+    behavior: 'smooth',
+  });
 }
