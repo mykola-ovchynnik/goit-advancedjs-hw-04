@@ -14,6 +14,8 @@ const elements = {
 
 elements.searchForm.addEventListener('submit', handlerSearch);
 
+const lightbox = new SimpleLightbox('.gallery a');
+
 const options = {
   root: null,
   rootMargin: '300px',
@@ -30,14 +32,20 @@ async function handlerSearch(event) {
   event.preventDefault();
 
   try {
-    searchQuery = elements.searchForm.searchQuery.value;
+    observer.disconnect();
     elements.gallery.innerHTML = '';
+
+    searchQuery = validateInput(elements.searchForm.searchQuery.value);
+
     page = 1;
+    shownItemCounter = 0;
 
     const totalHits = await serviceImages();
 
     showSuccessMessage(totalHits);
     observer.observe(elements.guard);
+
+    validateImgAmount(totalHits);
   } catch (err) {
     showErrorMessage(err.message);
   } finally {
@@ -48,14 +56,10 @@ async function handlerSearch(event) {
 async function serviceImages() {
   const { hits, totalHits } = await serviceGetImages(searchQuery, page);
 
-  elements.gallery.insertAdjacentHTML('beforeend', createMarkup(hits));
   shownItemCounter += 40;
+  elements.gallery.insertAdjacentHTML('beforeend', createMarkup(hits));
 
-  if (shownItemCounter >= totalHits) {
-    observer.disconnect();
-  }
-
-  initializeLightbox();
+  lightbox.refresh();
   return totalHits;
 }
 
@@ -96,18 +100,19 @@ function createMarkup(array) {
 
 function handlerLoadMore(entries) {
   entries.forEach(async entry => {
-    if (entry.isIntersecting) {
-      page += 1;
+    try {
+      if (entry.isIntersecting) {
+        page += 1;
 
-      enableSmoothScroll();
-      serviceImages();
+        const totalHits = await serviceImages();
+
+        validateImgAmount(totalHits);
+        enableSmoothScroll();
+      }
+    } catch (err) {
+      showErrorMessage(err.message);
     }
   });
-}
-
-function initializeLightbox() {
-  const lightbox = new SimpleLightbox('.gallery a');
-  lightbox.refresh();
 }
 
 function showSuccessMessage(totalHits) {
@@ -132,4 +137,24 @@ function enableSmoothScroll() {
     top: cardHeight * 2,
     behavior: 'smooth',
   });
+}
+
+function validateInput(inputValue) {
+  inputValue = inputValue.trim();
+
+  if (inputValue === '') {
+    throw new Error('Search field cannot be empty!');
+  }
+
+  return inputValue;
+}
+
+function validateImgAmount(totalHits) {
+  if (shownItemCounter >= totalHits) {
+    observer.disconnect();
+
+    throw new Error(
+      "We're sorry, but you've reached the end of search results."
+    );
+  }
 }

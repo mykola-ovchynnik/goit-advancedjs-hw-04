@@ -12,7 +12,7 @@ axios.defaults.params = {
   per_page: 40,
 };
 
-async function serviceGetImages(searchQuery, page) {
+async function serviceGetImages(searchQuery, page = 1) {
   const instance = axios.create({
     params: {
       q: searchQuery,
@@ -27,8 +27,6 @@ async function serviceGetImages(searchQuery, page) {
       'Sorry, there are no images matching your search query. Please try again.'
     );
   }
-
-  page += 1;
 
   return response.data;
 }
